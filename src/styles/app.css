@@ -1,0 +1,98 @@
+/* Kitchen estimator: page layout and components on top of the White Studio kit (studio-ui.css).
+   Brand colour arrives from business.config.js as --brand / --on-brand (set by main.js on <html>). */
+
+:root {
+  --brand: #2F5E4E;
+  --on-brand: #FFFFFF;
+  /* the kit's accent family follows the brand */
+  --p-accent: var(--brand);
+  --p-on-accent: var(--on-brand);
+  --p-accent-on-light: oklch(from var(--brand) min(l, .46) c h);
+  --p-accent-on-dark: oklch(from var(--brand) max(l, .78) min(c, .12) h);
+  --p-accent-2: oklch(from var(--brand) .9 calc(c * .35) h);
+  --p-on-accent-2: #121416;
+  --cta-bg: #121214;          /* the $300M button: almost black, not grey */
+  --cta-ink: #FFFFFF;
+  --cta-glow: rgba(255, 255, 255, .14);
+  --sel-ink: var(--ink);       /* text on a selected (white) option */
+  --sel-ink-2: var(--ink-2);
+  --panel-w: 420px;
+  --stage-r: 30px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --cta-bg: #F1F1F1; --cta-ink: #121214; --cta-glow: rgba(0, 0, 0, .08);
+    --sel-ink: #161616; --sel-ink-2: #4A4A4A;
+  }
+}
+
+html, body { height: 100%; }
+body.ws { overflow-x: clip; }
+
+/* ================================================================ layout */
+.app { display: grid; grid-template-columns: minmax(0, 1fr) var(--panel-w); height: 100dvh; }
+.panel { overflow-y: auto; overscroll-behavior: contain; padding: var(--s6) var(--s6) var(--s10); display: grid; align-content: start; gap: var(--s8); }
+@media (max-width: 1199px) { :root { --panel-w: 384px; } }
+
+/* ================================================================ the stage */
+.stage { position: relative; margin: 12px 0 12px 12px; border-radius: var(--stage-r); corner-shape: squircle; overflow: hidden; isolation: isolate;
+  background: radial-gradient(120% 90% at 55% 0%, var(--st-4) 0%, var(--st-1) 55%, var(--st-0) 100%); }
+@supports (corner-shape: squircle) { .stage { border-radius: calc(var(--stage-r) * 1.5); } }
+.stage::before { content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0; transition: opacity 900ms var(--ease);
+  background: radial-gradient(110% 85% at 50% 10%, #2B2A2E 0%, #17171A 55%, #0C0C0E 100%); }
+.stage.is-evening::before { opacity: 1; }
+#scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; cursor: grab; }
+#scene:active { cursor: grabbing; }
+#scene.is-pointing { cursor: pointer; }
+#scene:focus-visible { outline: 2.5px solid var(--focus); outline-offset: -6px; border-radius: inherit; }
+.stage-fallback { position: absolute; left: 50%; top: 50%; translate: -50% -50%; max-width: 32ch; text-align: center; color: var(--ink-2); }
+
+/* overlays on the stage are opaque enough to read over any part of the kitchen */
+.stage-tools { position: absolute; top: 16px; right: 16px; z-index: 3; display: grid; justify-items: end; gap: var(--s2); }
+.tool-row { display: flex; gap: var(--s2); }
+.stage .fg-pill { --pill-bg: color-mix(in srgb, var(--st-3) 90%, transparent); background: var(--pill-bg); color: var(--ink); gap: 6px; padding: 0 16px; font-size: 14px;
+  box-shadow: var(--lift-1); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.stage .fg-pill .i { width: 18px; height: 18px; }
+.stage .fg-pill[aria-pressed="true"] { background: var(--st-5); color: #121416; }
+@media (prefers-color-scheme: dark) { .stage .fg-pill[aria-pressed="true"] { background: #F1F1F1; } }
+.time-seg { flex-wrap: nowrap; gap: 4px; padding: 4px; border-radius: 999px; background: color-mix(in srgb, var(--st-2) 80%, transparent); }
+.time-seg .fg-pill { box-shadow: none; --pill-bg: transparent; background: transparent; min-height: 40px; }
+.time-seg .fg-pill[aria-pressed="true"] { box-shadow: var(--lift-1); }
+
+.stage-hint { position: absolute; left: 16px; bottom: 16px; z-index: 2; display: inline-flex; align-items: center; gap: 8px; margin: 0;
+  padding: 10px 14px; border-radius: 999px; background: color-mix(in srgb, var(--st-3) 92%, transparent); color: var(--ink-2); font-size: 13px; box-shadow: var(--lift-1);
+  transition: opacity var(--t-slow) var(--ease); }
+.stage-hint.gone { opacity: 0; pointer-events: none; }
+.stage-hint .i { width: 16px; height: 16px; }
+
+.tip { position: absolute; z-index: 4; left: 0; top: 0; pointer-events: none; padding: 7px 11px; border-radius: 12px; white-space: nowrap;
+  background: var(--ink); color: var(--st-3); font: 400 13px/1.2 var(--font); opacity: 0; transition: opacity var(--t-fast) var(--ease); }
+.tip.show { opacity: 1; }
+.tip b { font-weight: 500; }
+
+/* ================================================================ the live estimate card */
+.estimate { position: absolute; top: 16px; left: 16px; z-index: 3; width: min(372px, calc(100% - 32px)); padding: var(--s5); display: grid; gap: var(--s2); box-shadow: var(--lift-2); }
+.est-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
+.est-live { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 4px color-mix(in oklab, var(--brand) 22%, transparent); flex: none; }
+@media (prefers-color-scheme: dark) { .live-dot { background: var(--p-accent-on-dark); } }
+.est-price { margin: 2px 0 0; font: 400 34px/1.05 var(--font); letter-spacing: -0.035em; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink); }
+.est-price .dash { color: var(--ink-2); margin: 0 .18em; }
+.delta { position: absolute; right: var(--s5); top: 54px; opacity: 0; translate: 0 6px; transition: opacity var(--t) var(--ease), translate var(--t) var(--ease); font-variant-numeric: tabular-nums; }
+.delta.show { opacity: 1; translate: 0 0; }
+.est-note { text-wrap: pretty; }
+.cta-lead { margin-top: var(--s2); }
+
+/* ================================================================ the $300M button (NOTES.md 2026-10-14) */
+.cta { position: relative; display: inline-flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; min-height: 52px; padding: 6px 6px 6px 22px;
+  border-radius: 999px; background: var(--cta-bg); color: var(--cta-ink); font: 500 16px/1.2 var(--font); letter-spacing: -0.01em; text-align: left; overflow: hidden;
+  transition: transform .2s cubic-bezier(.23, 1, .32, 1), translate .35s cubic-bezier(.23, 1, .32, 1); }
+.cta::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s;
+  background: radial-gradient(120px circle at var(--mx, 50%) var(--my, 50%), var(--cta-glow), transparent 70%); }
+.cta:hover::before { opacity: 1; }
+.cta-label { position: relative; }
+.cta-dot { position: relative; width: 40px; height: 40px; border-radius: 50%; background: var(--brand); color: var(--on-brand); display: grid; place-items: center; flex: none; }
+.cta-dot .i { width: 18px; height: 18px; stroke-width: 2; transition: rotate .35s cubic-bezier(.23, 1, .32, 1); }
+.cta:hover .cta-dot .i { rotate: 45deg; }
+.cta:active { transform: scale(.97); }
+.cta:focus-visible { outline: 2.5px solid var(--focus); outline-offset: 3px; }

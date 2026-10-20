@@ -1,0 +1,147 @@
+/* FROST GLASS - frosted liquid glass, researched 2026-10-04 (Davis: "the jelly glass should be like a liquid glass,
+   basically from Apple, but frosted"; "almost borderless"; "a thin layer of white on it, very subtle"; "something
+   on top of it that's overlaid", not a shine mixed into the colour).
+
+   Measured on @rondesignlab's Hydroflask screens (DcJT7TBDAz1) and dyslove.design's mockup cards:
+   - NO outline. Edges are defined by the frost itself: colour fades out before the edge, so the rim reads as a
+     soft light band; at most a hairline of light where the light hits (top), fading to nothing on the sides.
+   - The colour sits UNDER a top coat: a faint white veil plus a fine grain (sandblasted-glass speckle) lying over
+     the colour, under the text. That coat is what makes it read as glass and not as a gradient.
+   - Pills are see-through frost with the veil; the selected pill is solid white with dark text.
+   - Capsules carry soft blurred colour fields (pink to green, navy to violet, orange to yellow) and a fine dotted
+     inner line following the shape.
+   - Liquid (Apple): the background bends at the rim. Chrome can do this with an SVG displacement map on the
+     backdrop (kube.io's technique); frost-glass.js builds the map per element. Everywhere else it stays frosted.
+   - Optional prism: a faint rainbow split where light crosses the rim (dyslove's "Premium Mockups" card).
+
+   Layers (back to front):  backdrop blur  ->  element background (frost tint + colour fields)
+                            ->  ::before top coat (veil + grain + soft edge haze), under the content
+                            ->  content  ->  ::after rim light (+ prism), over everything, pointer-events none.
+   Research: Josh Comeau "Next-level frosted glass" (extend + mask the backdrop), kube.io "Liquid Glass in the
+   Browser" (displacement maps, squircle bezel), Apple HIG Materials (Liquid Glass: content first, legibility,
+   reduced transparency), buildmvpfast "Liquid glass recipes" (blur 12-30, saturate 140-200, max 3-4 layers). */
+
+:root {
+  --fg-blur: 22px;                 /* frosting. Keep it static; never animate blur (it repaints every frame) */
+  --fg-sat: 150%;
+  --fg-tint: rgba(255,255,255,.16);        /* the frost's own whiteness, light appearance */
+  --fg-veil: .07;                          /* the top coat's white veil (very subtle; Davis: "almost unnoticeable") */
+  --fg-grain: .14;                         /* grain strength in the top coat */
+  --fg-rim: .34;                           /* rim light at the top edge, fades to 0 along the sides */
+  --fg-haze: rgba(255,255,255,.24);        /* light scattering in the glass thickness, just inside the edge */
+  --fg-lift: 0 18px 40px -24px rgba(16,20,28,.28);
+  --fg-r: 28px;                            /* radius (visual); squircle corners get 1.5x for the same look */
+  --fg-noise: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n' x='0' y='0'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' seed='4' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncR type='linear' slope='2.2' intercept='-.6'/><feFuncG type='linear' slope='2.2' intercept='-.6'/><feFuncB type='linear' slope='2.2' intercept='-.6'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  --fg-noise-dark: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n' x='0' y='0'><feTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='3' seed='9' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1.6 -0.6'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+@media (prefers-color-scheme: dark) {
+  :root { --fg-tint: rgba(255,255,255,.06); --fg-veil: .045; --fg-grain: .1; --fg-rim: .22; --fg-haze: rgba(255,255,255,.07);
+          --fg-lift: 0 22px 50px -26px rgba(0,0,0,.75); }
+}
+
+/* ------------------------------------------------------------ the material */
+.fg {
+  position: relative; isolation: isolate; border-radius: var(--fg-r); corner-shape: squircle;
+  /* back to front inside the box: frost tint -> colour fields -> the white veil ON TOP of the colour */
+  background:
+    linear-gradient(180deg, rgba(255,255,255,calc(var(--fg-veil) * 1.6)) 0%, rgba(255,255,255,var(--fg-veil)) 45%, rgba(255,255,255,calc(var(--fg-veil) * .6)) 100%),
+    var(--fg-fill, linear-gradient(transparent, transparent)),
+    linear-gradient(var(--fg-tint), var(--fg-tint));
+  -webkit-backdrop-filter: blur(var(--fg-blur)) saturate(var(--fg-sat));
+  backdrop-filter: blur(var(--fg-blur)) saturate(var(--fg-sat));
+  /* edge haze: light scattering inside the glass thickness, drawn over the colour, under the text. No outline. */
+  box-shadow: inset 0 0 22px 4px var(--fg-haze), var(--fg-lift);
+}
+@supports (corner-shape: squircle) { .fg { border-radius: calc(var(--fg-r) * 1.5); } }
+
+/* the grain: fine sandblasted speckle lying on top of the colour, under the text (z-index -1 in the isolated box) */
+.fg::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; corner-shape: inherit; pointer-events: none;
+  background: var(--fg-noise) 0 0 / 180px 180px; opacity: var(--fg-grain); mix-blend-mode: overlay;
+}
+
+/* the rim light: a hairline where the light hits (top), fading out along the sides. Not a border. */
+.fg::after {
+  content: ""; position: absolute; inset: 0; z-index: 2; border-radius: inherit; corner-shape: inherit; pointer-events: none; padding: 1px;
+  background: linear-gradient(180deg, rgba(255,255,255,var(--fg-rim)) 0%, rgba(255,255,255,calc(var(--fg-rim) * .25)) 22%, rgba(255,255,255,0) 50%, rgba(255,255,255,calc(var(--fg-rim) * .2)) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+
+/* ------------------------------------------------------------ colour inside the frost (their Flasks card, capsules) */
+/* Set up to three colours; they are soft fields that stop well before the edge, so the rim stays frosty.
+   style="--c1: var(--p-glow-core); --c2: oklch(from var(--p-glow-core) l c calc(h - 40)); --c3: ...". */
+.fg.color {
+  --fg-fill:
+    radial-gradient(52% 58% at 32% 34%, var(--c1, #23324A) 0%, color-mix(in srgb, var(--c1, #23324A) 75%, transparent) 40%, transparent 72%),
+    radial-gradient(50% 52% at 70% 80%, var(--c2, #4F8FA6) 0%, color-mix(in srgb, var(--c2, #4F8FA6) 60%, transparent) 42%, transparent 74%),
+    radial-gradient(30% 42% at 96% 48%, var(--c3, transparent) 0%, transparent 72%),
+    radial-gradient(70% 72% at 50% 50%, color-mix(in srgb, var(--c1, #23324A) 82%, var(--c2, #4F8FA6)) 0%, color-mix(in srgb, var(--c1, #23324A) 62%, transparent) 60%, transparent 100%);
+  --fg-haze: rgba(255,255,255,.34);
+  color: #fff;
+  box-shadow: inset 0 0 26px 6px var(--fg-haze), var(--fg-lift);
+}
+@media (prefers-color-scheme: dark) { .fg.color { --fg-haze: rgba(255,255,255,.05); --fg-grain: .2; } }
+.fg.color { --fg-grain: .3; }  /* the grain shows most on colour (their navy card is visibly speckled) */
+/* the fine dotted line inside a capsule (their 16.2 / 2.8 / 76 tiles) */
+.fg-dots { position: absolute; inset: 7px; border-radius: inherit; corner-shape: inherit; border: 1.5px dotted rgba(255,255,255,.45); pointer-events: none; }
+
+/* ------------------------------------------------------------ pills and small buttons (their "Molecular H...") */
+.fg-pill {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px;
+  border-radius: 999px; corner-shape: round; font: 400 15px/1 var(--font, "Inter Tight", system-ui, sans-serif); color: #4E5458;
+  background: linear-gradient(180deg, rgba(255,255,255,.34), rgba(255,255,255,.2));
+  -webkit-backdrop-filter: blur(14px) saturate(140%); backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -1px 0 rgba(255,255,255,.18), inset 0 0 10px rgba(255,255,255,.18);
+  transition: transform 120ms cubic-bezier(.22,.9,.25,1), background 200ms;
+}
+.fg-pill:active { transform: scale(.97); }
+.fg-pill[aria-selected="true"], .fg-pill[aria-pressed="true"], .fg-pill.on {      /* selected: solid white, dark text */
+  background: #fff; color: #121416; box-shadow: 0 6px 16px -8px rgba(16,20,28,.28), inset 0 -1px 0 rgba(0,0,0,.04); }
+@media (prefers-color-scheme: dark) {
+  .fg-pill { color: #E8EAEC; background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.18), inset 0 0 10px rgba(255,255,255,.05); }
+  .fg-pill[aria-selected="true"], .fg-pill[aria-pressed="true"], .fg-pill.on { background: #F4F5F6; color: #111315; }
+}
+/* round icon button in the same material (their back / info buttons): outline-free, a hairline of light */
+.fg-icon { width: 44px; height: 44px; border-radius: 50%; display: inline-grid; place-items: center; color: inherit;
+  background: rgba(255,255,255,.14); box-shadow: inset 0 0 0 1px rgba(255,255,255,.28), inset 0 1px 0 rgba(255,255,255,.45);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+/* solid white tile (their "+" capsule) */
+.fg-solid { background: #fff; color: #121416; border-radius: var(--fg-r); corner-shape: squircle; box-shadow: 0 14px 30px -18px rgba(16,20,28,.3); }
+@supports (corner-shape: squircle) { .fg-solid { border-radius: calc(var(--fg-r) * 1.5); } }
+
+/* ------------------------------------------------------------ dark / smoky glass (Vexto cards over photos) */
+.fg.smoke { --fg-tint: rgba(22,24,26,.5); --fg-veil: .04; --fg-rim: .2; --fg-haze: rgba(255,255,255,.05); --fg-sat: 120%; color: #fff; }
+
+/* ------------------------------------------------------------ prism: a faint rainbow where light crosses the rim (optional, tasteful) */
+/* Put .prism on a .fg. --prism-side picks where the light enters (right by default, as on dyslove's card).
+   Keep it to ONE element per screen, and never under text. */
+.fg.prism::after {
+  inset: -1px; filter: blur(3px); mix-blend-mode: plus-lighter; opacity: var(--prism, .5);
+  /* a short arc of spectrum around ONE corner (top-right by default), not a stripe down the whole side */
+  background: conic-gradient(from var(--prism-from, 38deg) at var(--prism-at, 72% 50%),
+      rgba(255,60,60,0) 0deg, rgba(255,80,70,.85) 10deg, rgba(255,205,70,.8) 20deg, rgba(90,255,160,.65) 31deg,
+      rgba(70,165,255,.85) 42deg, rgba(165,90,255,.8) 52deg, rgba(165,90,255,0) 64deg, rgba(0,0,0,0) 360deg);
+  -webkit-mask: linear-gradient(#000 0 0), linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  -webkit-mask-clip: border-box, content-box; padding: 4px;
+  mask: linear-gradient(#000 0 0) border-box, linear-gradient(#000 0 0) content-box; mask-composite: exclude;
+}
+.fg.prism.left  { --prism-at: 30% 50%; --prism-from: 208deg; }
+.fg.prism.top   { --prism-at: 50% 70%; --prism-from: 298deg; }
+.fg.prism.bottom{ --prism-at: 50% 30%; --prism-from: 118deg; }
+
+/* ------------------------------------------------------------ liquid: the background bends at the rim (Chrome) */
+/* Add .liquid and include scripts/frost-glass.js. It builds a displacement map for each element (a squircle bezel,
+   kube.io's method) and sets backdrop-filter: url(#map) blur() saturate(). Other browsers keep the frost. */
+.fg.liquid { --liquid-bezel: 22px; --liquid-strength: 26; }
+
+/* ------------------------------------------------------------ accessibility */
+@media (prefers-reduced-transparency: reduce) {
+  .fg, .fg-pill, .fg-icon { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .fg { background: var(--fg-fill, none), #EEF0F1; }
+  .fg::before { display: none; }
+  .fg.prism::after { display: none; }
+}
+@media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark) { .fg { background: var(--fg-fill, none), #1C1E20; } }
+@media (prefers-contrast: more) { .fg, .fg-pill, .fg-icon { outline: 2px solid currentColor; outline-offset: -2px; } }
